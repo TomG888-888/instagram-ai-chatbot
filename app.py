@@ -10,10 +10,15 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 def webhook():
 
     data = request.json
+
     user_message = data.get("text")
 
+    # защита от пустого сообщения
+    if not user_message:
+        user_message = "Hello"
+
     response = client.chat.completions.create(
-        model="gpt-4.1",
+        model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
