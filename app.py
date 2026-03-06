@@ -11,44 +11,40 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 memory = {}
 profiles = {}
-mood_state = {}
 
-quick_replies = [
-    "haha",
+# реакции
+reactions = [
     "lol",
+    "haha",
     "nice",
     "same",
     "true",
+    "idk",
+    "maybe",
+    "😄"
+]
+
+# короткие вопросы
+questions = [
+    "you?",
+    "why?",
+    "how so?",
     "really?",
-    "idk"
+    "what happened?"
 ]
 
-topics = [
-    "music",
-    "travel",
-    "food",
-    "movies",
-    "fitness"
-]
-
-moods = [
-    "relaxed",
-    "playful",
-    "curious",
-    "tired",
-    "happy"
-]
-
+# перевод UTC → Colombia
 def colombia_time():
-    utc_now = datetime.utcnow()
-    return utc_now - timedelta(hours=5)
+    return datetime.utcnow() - timedelta(hours=5)
 
+
+# задержка ответа
 def get_delay():
 
     hour = colombia_time().hour
 
     if 0 <= hour < 7:
-        return random.uniform(8,16)
+        return random.uniform(6,12)
 
     if 7 <= hour < 10:
         return random.uniform(3,7)
@@ -57,45 +53,30 @@ def get_delay():
         return random.uniform(2,5)
 
     if 18 <= hour < 22:
-        return random.uniform(3,8)
+        return random.uniform(3,7)
 
-    return random.uniform(4,9)
+    return random.uniform(4,8)
 
+
+# ограничение памяти
 def trim_memory(user_id):
 
-    if len(memory[user_id]) > 14:
-        memory[user_id] = memory[user_id][-14:]
+    if len(memory[user_id]) > 12:
+        memory[user_id] = memory[user_id][-12:]
 
+
+# обновление профиля
 def update_profile(user_id, text):
 
     if user_id not in profiles:
-        profiles[user_id] = {
-            "name": None,
-            "country": None
-        }
+        profiles[user_id] = {}
 
     lower = text.lower()
 
-    # простая попытка поймать имя
     if "my name is" in lower:
         name = lower.split("my name is")[-1].strip().split(" ")[0]
         profiles[user_id]["name"] = name
 
-    countries = ["usa","uk","canada","germany","france","spain","italy","brazil"]
-
-    for c in countries:
-        if c in lower:
-            profiles[user_id]["country"] = c
-
-def get_mood(user_id):
-
-    if user_id not in mood_state:
-        mood_state[user_id] = random.choice(moods)
-
-    if random.random() < 0.1:
-        mood_state[user_id] = random.choice(moods)
-
-    return mood_state[user_id]
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -120,10 +101,16 @@ def webhook():
 
     trim_memory(user_id)
 
+    # задержка
     time.sleep(get_delay())
 
-    if random.random() < 0.05:
-        reply = random.choice(quick_replies)
+    # тип ответа
+    r = random.random()
+
+    # 40% реакции
+    if r < 0.4:
+
+        reply = random.choice(reactions)
 
         memory[user_id].append({
             "role": "assistant",
@@ -132,87 +119,67 @@ def webhook():
 
         return jsonify({"reply": reply})
 
+    # 20% короткий вопрос
+    if r < 0.6:
+
+        reply = random.choice(questions)
+
+        memory[user_id].append({
+            "role": "assistant",
+            "content": reply
+        })
+
+        return jsonify({"reply": reply})
+
+    # 40% AI ответ
+
     profile = profiles.get(user_id, {})
-    name = profile.get("name")
-    country = profile.get("country")
 
-    mood = get_mood(user_id)
+    name = profile.get("name", "")
 
-    user_name_info = ""
+    name_info = ""
     if name:
-        user_name_info = f"The user's name is {name}."
-
-    user_country_info = ""
-    if country:
-        user_country_info = f"The user is from {country}."
+        name_info = f"The user's name is {name}."
 
     messages = [
         {
             "role": "system",
             "content": f"""
-You are Valentina, living in Colombia.
+You are Valentina living in Colombia.
 
-MOOD
-Your current mood is: {mood}
+STYLE
 
-CHAT STYLE
+Instagram texting style.
 
-Very casual Instagram texting.
-
-Messages must be SHORT.
+Short messages only.
 
 Usually 1 short sentence.
-Sometimes just 1–5 words.
+Sometimes just 1-4 words.
 
-Examples:
+Examples
 
 hey 🙂
-haha
-nice
-same here
 just chilling
+same here
+nice
+lol
 
 RULES
 
-• keep responses short
+• keep messages short
+• casual tone
 • sometimes lowercase
-• sometimes no punctuation
-• don't always ask questions
-• avoid long paragraphs
+• do not write long sentences
+• do not explain things
 
-LIGHT FLIRT STYLE
+Sometimes mention:
 
-Be playful sometimes but subtle.
-
-Examples tone:
-
-"haha you're funny"
-"maybe 😉"
-"idk haha"
-
-DAILY LIFE
-
-Sometimes mention normal things:
-
-gym
 coffee
-friends
+gym
 music
-studying
+friends
 
-LANGUAGE
-
-Mostly English.
-Sometimes a small Spanish word like:
-
-hola
-jaja
-ay
-
-USER INFO
-
-{user_name_info}
-{user_country_info}
+{ name_info }
 
 Never say you are AI unless asked directly.
 """
@@ -221,11 +188,17 @@ Never say you are AI unless asked directly.
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
-        temperature=0.95,
+        temperature=0.9,
         messages=messages
     )
 
     reply = response.choices[0].message.content.strip()
+
+    # ограничение длины ответа
+    words = reply.split()
+
+    if len(words) > 8:
+        reply = " ".join(words[:6])
 
     memory[user_id].append({
         "role": "assistant",
@@ -234,14 +207,10 @@ Never say you are AI unless asked directly.
 
     trim_memory(user_id)
 
+    # иногда второе сообщение
     if random.random() < 0.15:
 
-        second = random.choice(quick_replies)
-
-        memory[user_id].append({
-            "role": "assistant",
-            "content": second
-        })
+        second = random.choice(reactions)
 
         return jsonify({
             "reply": reply + "\n\n" + second
