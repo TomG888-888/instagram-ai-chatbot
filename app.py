@@ -10,7 +10,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 def webhook():
 
     data = request.json
-    user_message = data.get("message")
+    user_message = data.get("text")
 
     response = client.chat.completions.create(
         model="gpt-4.1",
