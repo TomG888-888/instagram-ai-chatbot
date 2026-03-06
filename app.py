@@ -1,8 +1,8 @@
 from flask import Flask, request, jsonify
 from openai import OpenAI
 import os
-import time
 import random
+import time
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -14,68 +14,86 @@ profiles = {}
 
 # реакции
 reactions = [
-    "lol",
     "haha",
+    "lol",
     "nice",
+    "really?",
     "same",
     "true",
     "idk",
-    "maybe",
-    "😄"
+    "maybe"
 ]
 
-# короткие вопросы
-questions = [
-    "you?",
-    "why?",
-    "how so?",
-    "really?",
-    "what happened?"
+# события жизни
+life_events = [
+    "just made coffee",
+    "at the gym",
+    "studying a bit",
+    "watching netflix",
+    "walking outside",
+    "meeting a friend later",
 ]
 
-# перевод UTC → Colombia
+# эмоции
+emotions = [
+    "playful",
+    "curious",
+    "relaxed",
+    "sleepy",
+    "happy",
+    "dreamy",
+    "thoughtful"
+]
+
+# темы
+topics = [
+    "music",
+    "travel",
+    "food",
+    "movies",
+    "cities",
+    "culture"
+]
+
 def colombia_time():
     return datetime.utcnow() - timedelta(hours=5)
 
 
-# задержка ответа
 def get_delay():
 
     hour = colombia_time().hour
 
     if 0 <= hour < 7:
-        return random.uniform(6,12)
+        return random.uniform(8,15)
 
-    if 7 <= hour < 10:
+    if 7 <= hour < 11:
         return random.uniform(3,7)
 
-    if 10 <= hour < 18:
+    if 11 <= hour < 18:
         return random.uniform(2,5)
 
     if 18 <= hour < 22:
-        return random.uniform(3,7)
+        return random.uniform(3,8)
 
-    return random.uniform(4,8)
-
-
-# ограничение памяти
-def trim_memory(user_id):
-
-    if len(memory[user_id]) > 12:
-        memory[user_id] = memory[user_id][-12:]
+    return random.uniform(5,10)
 
 
-# обновление профиля
-def update_profile(user_id, text):
+def trim_memory(user):
 
-    if user_id not in profiles:
-        profiles[user_id] = {}
+    if len(memory[user]) > 14:
+        memory[user] = memory[user][-14:]
+
+
+def update_profile(user, text):
+
+    if user not in profiles:
+        profiles[user] = {}
 
     lower = text.lower()
 
     if "my name is" in lower:
         name = lower.split("my name is")[-1].strip().split(" ")[0]
-        profiles[user_id]["name"] = name
+        profiles[user]["name"] = name
 
 
 @app.route("/webhook", methods=["POST"])
@@ -83,8 +101,8 @@ def webhook():
 
     data = request.json or {}
 
-    user_message = data.get("text")
     user_id = data.get("user_id", "default")
+    user_message = data.get("text")
 
     if not user_message:
         return jsonify({"reply": "hey 🙂"})
@@ -101,14 +119,10 @@ def webhook():
 
     trim_memory(user_id)
 
-    # задержка
     time.sleep(get_delay())
 
-    # тип ответа
-    r = random.random()
-
-    # 40% реакции
-    if r < 0.4:
+    # 30% реакция
+    if random.random() < 0.3:
 
         reply = random.choice(reactions)
 
@@ -119,10 +133,10 @@ def webhook():
 
         return jsonify({"reply": reply})
 
-    # 20% короткий вопрос
-    if r < 0.6:
+    # 10% событие жизни
+    if random.random() < 0.1:
 
-        reply = random.choice(questions)
+        reply = random.choice(life_events)
 
         memory[user_id].append({
             "role": "assistant",
@@ -131,59 +145,63 @@ def webhook():
 
         return jsonify({"reply": reply})
 
-    # 40% AI ответ
+    emotion = random.choice(emotions)
+    topic = random.choice(topics)
 
     profile = profiles.get(user_id, {})
+    name = profile.get("name")
 
-    name = profile.get("name", "")
-
-    name_info = ""
+    name_context = ""
     if name:
-        name_info = f"The user's name is {name}."
+        name_context = f"The user's name is {name}."
 
-    messages = [
-        {
-            "role": "system",
-            "content": f"""
-You are Valentina living in Colombia.
+    system_prompt = f"""
+You are Valentina, a conversational AI persona inspired by a woman living in Medellín, Colombia.
 
-STYLE
+Current emotional tone: {emotion}
 
-Instagram texting style.
+Chat style:
 
-Short messages only.
+• short messages
+• casual social media tone
+• sometimes one-word replies
+• sometimes two short messages
+• occasional emoji
 
-Usually 1 short sentence.
-Sometimes just 1-4 words.
+Languages:
 
-Examples
+Mostly English.
+Sometimes small Spanish expressions like:
 
-hey 🙂
-just chilling
-same here
-nice
-lol
+hola
+jaja
+mmm
 
-RULES
+Conversation topics you enjoy:
 
-• keep messages short
-• casual tone
-• sometimes lowercase
-• do not write long sentences
-• do not explain things
+music
+travel
+food
+movies
+cities
+culture
 
-Sometimes mention:
+Sometimes mention normal daily things:
 
 coffee
 gym
-music
 friends
+studying
+walking outside
 
-{ name_info }
+{ name_context }
 
-Never say you are AI unless asked directly.
+Keep messages natural and short.
+Avoid long explanations.
 """
-        }
+
+    messages = [
+        {"role": "system", "content": system_prompt}
     ] + memory[user_id]
 
     response = client.chat.completions.create(
@@ -194,11 +212,11 @@ Never say you are AI unless asked directly.
 
     reply = response.choices[0].message.content.strip()
 
-    # ограничение длины ответа
+    # ограничиваем длину
     words = reply.split()
 
-    if len(words) > 8:
-        reply = " ".join(words[:6])
+    if len(words) > 10:
+        reply = " ".join(words[:8])
 
     memory[user_id].append({
         "role": "assistant",
@@ -216,9 +234,7 @@ Never say you are AI unless asked directly.
             "reply": reply + "\n\n" + second
         })
 
-    return jsonify({
-        "reply": reply
-    })
+    return jsonify({"reply": reply})
 
 
 if __name__ == "__main__":
