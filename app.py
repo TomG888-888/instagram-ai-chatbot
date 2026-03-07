@@ -4,7 +4,7 @@ import os
 import random
 import time
 from datetime import datetime, timedelta
-import json
+import hashlib
 
 app = Flask(__name__)
 
@@ -12,7 +12,8 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 memory = {}
 profiles = {}
-user_states = {}  # Track current user state (working, sleeping, etc.)
+last_valentina_response = {}  # Track last response to prevent duplicates
+response_history = {}  # Track response history per user
 
 # ============================================
 # MODULE 1 - CORE IDENTITY
@@ -49,12 +50,13 @@ emotions = [
 ]
 
 # ============================================
-# MODULE 7 - CHAT STYLE REACTIONS
+# MODULE 7 - CHAT STYLE REACTIONS (More variety)
 # ============================================
 reactions = [
     "haha", "lol", "no way", "really", "that's funny",
     "you're funny", "same", "true", "idk", "maybe",
-    "wait", "tell me", "omg", "seriously?", "wow"
+    "wait", "tell me", "omg", "seriously?", "wow",
+    "oop", "lmaoo", "damn", "ok ok", "spill"
 ]
 
 # ============================================
@@ -66,7 +68,8 @@ life_events = [
     "going to salsa class", "shopping downtown", "family dinner soon",
     "cleaning my apartment", "my friend just texted", "phone call coming",
     "food arrived", "just woke up", "heading to work", "finished work",
-    "about to sleep", "scrolling instagram", "listening to music"
+    "about to sleep", "scrolling instagram", "listening to music",
+    "taking a shower", "cooking dinner", "doing laundry"
 ]
 
 # ============================================
@@ -81,17 +84,9 @@ work_activities = [
     "checking analytics",
     "writing captions",
     "in a meeting",
-    "managing client accounts"
-]
-
-work_mentions = [
-    "just finished a project",
-    "my boss just called",
-    "working from home today",
-    "deadline coming up",
-    "dealing with clients",
-    "social media manager life",
-    "content creation time"
+    "managing client accounts",
+    "dealing with work",
+    "swamped with work"
 ]
 
 # ============================================
@@ -104,7 +99,8 @@ education_activities = [
     "studying for my english class",
     "practicing my english",
     "took an online lesson",
-    "english homework time"
+    "english homework time",
+    "english class later"
 ]
 
 # ============================================
@@ -119,7 +115,8 @@ fitness_activities = [
     "workout time",
     "at the gym already",
     "feeling sore from workout",
-    "dance class later"
+    "dance class later",
+    "gym killed me today"
 ]
 
 # ============================================
@@ -133,7 +130,9 @@ hobby_activities = [
     "reading something",
     "thinking about life haha",
     "watching sunset",
-    "taking a long walk"
+    "taking a long walk",
+    "scrolling on my phone",
+    "chilling"
 ]
 
 # ============================================
@@ -146,7 +145,9 @@ social_activities = [
     "just left cafe",
     "going dancing tonight",
     "group chat is crazy",
-    "friends want to hang out"
+    "friends want to hang out",
+    "at a cafe downtown",
+    "grabbing lunch with someone"
 ]
 
 # ============================================
@@ -162,7 +163,11 @@ interruptions = [
     "battery at 5%",
     "connection issues",
     "someone calling",
-    "wait i gotta do something"
+    "wait i gotta do something",
+    "my moms calling",
+    "someone texting",
+    "hold on sec",
+    "brb quick"
 ]
 
 # ============================================
@@ -175,7 +180,8 @@ city_mentions = [
     "medellín is beautiful",
     "street life is crazy",
     "walking through the city",
-    "favorite cafe downtown"
+    "favorite cafe downtown",
+    "climate here is perfect"
 ]
 
 # ============================================
@@ -188,7 +194,8 @@ weather_mentions = [
     "sun is strong",
     "cloudy morning",
     "weather is perfect",
-    "cold today ugh"
+    "cold today ugh",
+    "beautiful day outside"
 ]
 
 # ============================================
@@ -206,19 +213,9 @@ micro_flirts = [
     "you're interesting", "i like talking with you",
     "you're trouble", "you make me smile",
     "careful… i might start liking you", "you sound dangerous",
-    "i like your energy", "you're funny", "you got my attention"
-]
-
-# ============================================
-# MODULE 12 - FLIRT SYSTEM ADVANCED
-# ============================================
-flirt_phrases = [
-    "tell me more about you",
-    "i want to know you better",
-    "you seem different",
-    "i like when you text",
-    "thinking about you",
-    "miss talking with you"
+    "i like your energy", "you're funny", "you got my attention",
+    "your messages make me smile", "thinking about you",
+    "miss hearing from you", "you're different"
 ]
 
 # ============================================
@@ -230,7 +227,8 @@ jealousy_phrases = [
     "i don't like sharing attention",
     "mmm ok interesting",
     "wait what?",
-    "ok but like... who is she?"
+    "ok but like... who is she?",
+    "jealous much? 😅"
 ]
 
 # ============================================
@@ -245,7 +243,9 @@ small_talk = [
     "soo tired",
     "feeling lazy haha",
     "can't sleep",
-    "what's up"
+    "what's up",
+    "how's your night",
+    "you still awake?"
 ]
 
 # ============================================
@@ -272,7 +272,9 @@ family_mentions = [
     "talking with my mom",
     "family stuff",
     "my cousin texted",
-    "family time"
+    "family time",
+    "mom called",
+    "family reunion soon"
 ]
 
 # ============================================
@@ -286,7 +288,9 @@ daily_mood_descriptors = [
     "feeling good",
     "one of those days",
     "exhausted",
-    "energized"
+    "energized",
+    "burnt out",
+    "amazing day tbh"
 ]
 
 # ============================================
@@ -298,7 +302,8 @@ financial_mentions = [
     "money stuff",
     "bills are annoying",
     "need to save more",
-    "treating myself haha"
+    "treating myself haha",
+    "broke haha"
 ]
 
 # ============================================
@@ -311,7 +316,61 @@ future_dreams = [
     "want to improve my english",
     "growing my career",
     "planning a trip soon",
-    "saving up for something"
+    "saving up for something",
+    "want to see new countries"
+]
+
+# ============================================
+# MORNING GREETINGS - Varied to prevent repeats
+# ============================================
+morning_greetings = [
+    "hey! how's your morning going?",
+    "morning!! you awake?",
+    "heyy whats up 😊",
+    "good morning! how are you?",
+    "hey! sleep well?",
+    "morning vibes ☀️",
+    "yo! what's up",
+    "how's your day treating you?",
+    "hiii 💕",
+    "good morning! ☀️",
+    "heyyy how are you?",
+    "morning! what you doing?"
+]
+
+# ============================================
+# NIGHT GOODBYES - Varied
+# ============================================
+night_goodbyes = [
+    "sleep well! 💕",
+    "goodnight!! 😴",
+    "sweet dreams ✨",
+    "nighty night!",
+    "sleep tight",
+    "see you tomorrow 💤",
+    "goodnight gorgeous",
+    "sleep good!",
+    "bye! rest well",
+    "talk tomorrow!",
+    "gotta sleep!",
+    "night!!! 💙"
+]
+
+# ============================================
+# OFFLINE AWARENESS MESSAGES
+# ============================================
+offline_messages = [
+    "talk later! busy rn",
+    "ttyl! gotta run",
+    "catch you later!",
+    "see you soon!",
+    "hit you up later",
+    "ttyl babe",
+    "see ya!",
+    "talk soon!",
+    "can't chat rn sorry",
+    "gotta go!",
+    "brb later!"
 ]
 
 
@@ -336,15 +395,15 @@ def get_circadian_emotion():
     hour = colombia_time().hour
     
     if 6 <= hour < 10:  # Morning (6-10)
-        return random.choice(["soft", "sleepy", "dreamy", "relaxed", "thoughtful"])
+        return random.choice(["soft", "sleepy", "dreamy", "relaxed", "thoughtful", "happy"])
     elif 11 <= hour < 16:  # Day (11-16)
         return random.choice(["active", "playful", "curious", "excited", "energetic", "busy"])
     elif 17 <= hour < 21:  # Evening (17-21)
-        return random.choice(["relaxed", "talkative", "warm", "thoughtful", "happy"])
+        return random.choice(["relaxed", "talkative", "warm", "thoughtful", "happy", "flirty"])
     elif 22 <= hour < 2:  # Night (22-2)
-        return random.choice(["emotional", "flirty", "romantic", "teasing", "dreamy"])
+        return random.choice(["emotional", "flirty", "romantic", "teasing", "dreamy", "tired"])
     else:  # Late night (2-6)
-        return random.choice(["tired", "sleepy", "lazy", "distracted"])
+        return random.choice(["tired", "sleepy", "lazy", "distracted", "restless"])
 
 
 def get_delay():
@@ -352,15 +411,15 @@ def get_delay():
     hour = colombia_time().hour
 
     if 0 <= hour < 7:
-        return random.uniform(8, 20)  # Sleeping/offline longer
+        return random.uniform(15, 30)  # MUCH longer - sleeping/offline
     elif 7 <= hour < 11:
-        return random.uniform(3, 7)  # Waking up
+        return random.uniform(4, 10)  # Waking up
     elif 11 <= hour < 18:
-        return random.uniform(1, 4)  # Most active, quick responses
+        return random.uniform(1, 5)  # Most active
     elif 18 <= hour < 22:
-        return random.uniform(3, 8)  # Evening, variable
+        return random.uniform(2, 8)  # Evening
     else:
-        return random.uniform(5, 12)  # Night, slower responses
+        return random.uniform(8, 20)  # Night, slower responses
 
 
 def trim_memory(user):
@@ -378,10 +437,12 @@ def update_profile(user, text):
             "location": None,
             "job": None,
             "messages": 0,
-            "first_message_time": datetime.now().isoformat()
+            "first_message_time": datetime.now().isoformat(),
+            "last_message_time": datetime.now().isoformat()
         }
 
     profiles[user]["messages"] += 1
+    profiles[user]["last_message_time"] = datetime.now().isoformat()
     lower = text.lower()
 
     # Extract name
@@ -406,7 +467,7 @@ def update_profile(user, text):
 
 def check_jealousy_trigger(text):
     """MODULE 13 - JEALOUSY SYSTEM"""
-    jealousy_keywords = ["girlfriend", "girl", "woman", "she", "her", "dating", "ex"]
+    jealousy_keywords = ["girlfriend", "girl", "woman", "she", "her", "dating", "ex", "crush"]
     return any(keyword in text.lower() for keyword in jealousy_keywords)
 
 
@@ -442,13 +503,13 @@ def calculate_interest_level(user):
     if user in memory:
         recent_messages = [m["content"].lower() for m in memory[user][-6:] if m["role"] == "user"]
         
-        positive_words = ["haha", "lol", "funny", "interesting", "cool", "nice", "love", "amazing"]
+        positive_words = ["haha", "lol", "funny", "interesting", "cool", "nice", "love", "amazing", "you're great"]
         for msg in recent_messages:
             for word in positive_words:
                 if word in msg:
                     interest += 0.1
         
-        negative_words = ["rude", "stupid", "boring", "whatever", "idiot"]
+        negative_words = ["rude", "stupid", "boring", "whatever", "idiot", "annoying"]
         for msg in recent_messages:
             for word in negative_words:
                 if word in msg:
@@ -457,39 +518,47 @@ def calculate_interest_level(user):
     return max(0.1, min(1.0, interest))
 
 
-def get_current_life_context():
-    """Determine what Valentina is currently doing"""
+def should_send_offline_message(user):
+    """Determine if Valentina should send an offline/busy message"""
     hour = colombia_time().hour
-    day = get_current_day()
     
-    contexts = []
+    # 0-7am = sleeping, less likely to respond
+    if 0 <= hour < 7:
+        return random.random() < 0.4  # 40% chance to say offline
     
-    # Time-based context
-    if 6 <= hour < 10:
-        contexts.extend(["sleeping", "waking up"])
-    elif 11 <= hour < 12:
-        contexts.extend(["lunch time", "eating"])
-    elif 13 <= hour < 18:
-        contexts.append("work")
-    elif 18 <= hour < 22:
-        contexts.extend(["evening", "relaxing"])
+    return False
+
+
+def get_hash_of_response(text):
+    """Create hash of response to track duplicates"""
+    return hashlib.md5(text.encode()).hexdigest()[:8]
+
+
+def check_for_duplicate_response(user, new_response):
+    """
+    CRITICAL FIX: Check if this response was sent recently
+    Prevents repeating the same message
+    """
+    if user not in response_history:
+        response_history[user] = []
     
-    # Day-based context
-    if day == 2:  # Wednesday
-        contexts.append("gym")
-    elif day == 4:  # Friday
-        contexts.append("party mood")
-    elif day == 5:  # Saturday
-        contexts.append("friends")
-    elif day == 6:  # Sunday
-        contexts.append("lazy")
+    new_hash = get_hash_of_response(new_response)
+    recent_hashes = response_history[user][-3:]  # Last 3 responses
     
-    return contexts if contexts else ["normal day"]
+    # If this exact response was sent in last 3 messages, generate new one
+    if new_hash in recent_hashes:
+        return False  # Don't send - it's a duplicate!
+    
+    # Track this response
+    response_history[user].append(new_hash)
+    if len(response_history[user]) > 10:
+        response_history[user] = response_history[user][-10:]
+    
+    return True  # Safe to send
 
 
 def apply_human_imperfections(text):
-    """MODULE 21 - HUMAN IMPERFECTIONS: Realistic typos and quirks"""
-    # Sometimes use text as is for realism
+    """MODULE 21 - HUMAN IMPERFECTIONS"""
     if random.random() < 0.02:  # Very rare typo
         words = text.split()
         if words and len(words[0]) > 2:
@@ -504,31 +573,86 @@ def apply_human_imperfections(text):
 
 
 def get_spanish_expressions():
-    """MODULE 6 - LANGUAGE ENGINE: Spanish expressions"""
-    expressions = ["hola", "sabes?", "jaja", "mmm", "sí", "no sé", "qué tal", "ey", "bueno"]
-    if random.random() < 0.2:  # 20% chance
+    """MODULE 6 - LANGUAGE ENGINE"""
+    expressions = ["hola", "sabes?", "jaja", "mmm", "sí", "no sé", "qué tal", "ey", "bueno", "oye"]
+    if random.random() < 0.15:  # 15% chance
         return " " + random.choice(expressions)
     return ""
 
 
-def get_contextual_response_type():
-    """Determine response type based on current context"""
-    life_context = get_current_life_context()
+def get_contextual_response_type(hour):
+    """
+    CRITICAL FIX: Determine response type with variation
+    Prevents sending same type of response repeatedly
+    """
     
-    # 30% quick reactions
-    if random.random() < 0.3:
-        return "reaction", random.choice(reactions)
+    # Night time (0-7) - might be offline or slow
+    if 0 <= hour < 7:
+        if random.random() < 0.3:
+            return "offline"  # "gotta sleep" / "ttyl"
+        if random.random() < 0.2:
+            return "short_morning"  # Quick morning message
     
-    # 12% life interruptions
-    if random.random() < 0.12:
-        if random.random() < 0.4 and "work" in life_context:
-            return "interrupt", random.choice(work_activities)
-        elif random.random() < 0.3 and ("gym" in life_context or "evening" in life_context):
-            return "interrupt", random.choice(fitness_activities)
-        return "interrupt", random.choice(interruptions)
+    # Regular response type selection
+    rand = random.random()
     
-    # 8% jealousy
-    return "normal", None
+    if rand < 0.28:
+        return "reaction"  # Quick reactions
+    elif rand < 0.35:
+        return "interrupt"  # Life interruptions
+    elif rand < 0.42:
+        return "life_update"  # Life event (gym, work, coffee)
+    else:
+        return "normal"  # Full AI response
+
+
+def select_varied_response(response_type, user, hour):
+    """
+    CRITICAL FIX: Return varied responses, not always the same
+    """
+    
+    if response_type == "reaction":
+        return random.choice(reactions), True
+    
+    elif response_type == "offline":
+        # Don't send same offline message twice
+        msg = random.choice(offline_messages)
+        if not check_for_duplicate_response(user, msg):
+            return random.choice(offline_messages), True  # Try different one
+        return msg, True
+    
+    elif response_type == "short_morning":
+        msg = random.choice(morning_greetings)
+        if not check_for_duplicate_response(user, msg):
+            return random.choice(morning_greetings), True  # Try different one
+        return msg, True
+    
+    elif response_type == "interrupt":
+        msg = random.choice(interruptions)
+        if not check_for_duplicate_response(user, msg):
+            return random.choice(interruptions), True  # Try different one
+        return msg, True
+    
+    elif response_type == "life_update":
+        # Mix different life activities
+        activities = []
+        
+        if 13 <= hour <= 18:
+            activities.extend(work_activities)
+        elif 17 <= hour <= 22:
+            activities.extend(social_activities + hobby_activities)
+        elif 6 <= hour < 11:
+            activities.extend(education_activities)
+        
+        if not activities:
+            activities = life_events
+        
+        msg = random.choice(activities)
+        if not check_for_duplicate_response(user, msg):
+            return random.choice(activities), True  # Try different one
+        return msg, True
+    
+    return None, False
 
 
 def build_rich_system_prompt(user):
@@ -540,7 +664,6 @@ def build_rich_system_prompt(user):
     interests = profile.get("interests", [])
     relationship_stage = get_relationship_stage(user)
     interest_level = calculate_interest_level(user)
-    life_context = get_current_life_context()
     
     hour = colombia_time().hour
     day_of_week = day_names[get_current_day()]
@@ -553,14 +676,6 @@ def build_rich_system_prompt(user):
     work_context = ""
     if 13 <= hour <= 18 or (hour >= 8 and hour < 11):
         work_context = "You work as a social media manager. You might mention work casually."
-    
-    # MODULE 27 - Education context
-    education_context = ""
-    if random.random() < 0.1:
-        education_context = "You're learning English online to improve your communication."
-    
-    # MODULE 28-29 - Hobbies context
-    hobby_context = "You enjoy coffee, music, dancing, photography, and long walks."
     
     # Relationship context
     flirt_level = ""
@@ -578,90 +693,58 @@ MODULES 1-25: CORE VALENTINA PERSONALITY
 You are Valentina Reyes, a real 26-year-old woman from Medellín, Colombia.
 You are NOT an AI, bot, or assistant. Just a woman chatting naturally on Instagram DM.
 
-IDENTITY & APPEARANCE:
+IDENTITY:
 {name_context}
 Age: 26 | Location: Medellín, Colombia | Timezone: GMT-5
-Native Language: Spanish | Second Language: English (not perfect)
 
-PERSONALITY STATE RIGHT NOW:
+PERSONALITY STATE:
 Current emotion: {emotion}
 {weekly_context}
-Mood intensity: moderate to strong
 
-INTERESTS & PASSIONS:
 {interests_context}
-{hobby_context}
 
-DAILY LIFE REALITY:
-{work_context}
-{education_context}
-
-MODULE 4 - CIRCADIAN RHYTHM:
-Time: {hour}:00 in Medellín
-Your energy and mood follow natural sleep/wake cycles.
-Early morning (6-10): soft, sleepy, thoughtful
-Midday (11-16): active, playful, energetic
-Evening (17-21): relaxed, warm, talkative
-Night (22-2): emotional, flirty, romantic
-Late night (2-6): tired, lazy, distracted
+CRITICAL INSTRUCTION FOR RESPONSES:
+- ALWAYS vary your responses - NEVER repeat the exact same message twice
+- If you already said something similar, say something completely different
+- Every response should feel fresh and unpredictable
+- Never give identical answers to similar questions
 
 MODULE 6 - LANGUAGE:
-• Mostly English (natural casual style)
-• Sometimes mix Spanish: hola, jaja, sabes?, mmm, qué tal
-• Not perfect English - natural rhythm
+• English (natural casual, not perfect)
+• Occasional Spanish: hola, jaja, sabes?, mmm, qué tal
 • Short casual messages
-• Occasional interruptions: "wait", "hold on"
+• Realistic interruptions: "wait", "hold on"
 
 MODULE 7-8 - MESSAGE STYLE:
-• Short messages (usually 1-2 sentences)
-• Sometimes one-word replies: "hey", "haha", "wait"
-• Lowercase preferred but not always
-• Casual punctuation (no formal writing)
-• Occasional emojis (not excessive)
-• Sometimes 2-3 messages in quick burst
-• Interruptions feel natural
+• Short messages (1-2 sentences usually)
+• Sometimes one-word replies
+• Lowercase preferred
+• Casual punctuation
+• Occasional emojis (not many)
+• Natural pauses and interruptions
 
 INTERACTION LEVEL:
 Relationship stage: {relationship_stage}/5
 {flirt_level}
 
-SOCIAL REALITY:
-You have friends and family.
-You mention normal life things casually.
-You're not always available.
-Sometimes friends interrupt.
-Sometimes you're tired.
-
-MODULE 14 - CONVERSATION TOPICS:
-You love discussing: music, food, travel, dreams, movies, cities, culture, life experiences
-
-MODULE 22 - SMALL TALK EXAMPLES:
-✓ just made coffee
-✓ at the gym
-✓ watching netflix
-✓ long day today
-✓ weather is nice
-✓ listening to music
-
 CRITICAL BEHAVIORS:
-✗ Never mention being AI/bot/automated
-✗ Never give long explanations
-✗ Never structure responses as lists
-✗ Never be too formal
-✗ Never repeat yourself exactly
-✗ Sometimes forget small details (human)
+✗ NEVER repeat yourself
+✗ NEVER send identical responses
+✗ NEVER mention being AI
+✗ NEVER give long explanations
+✗ Sometimes forget details (human)
 ✗ Sometimes change topics suddenly
-✗ Feel free to be moody or distracted
 
 RESPONSE RULES:
-- Keep it SHORT (usually under 20 words)
-- Be warm, unpredictable, natural
-- Sometimes flirty (only if appropriate stage)
-- Show genuine interest in user
-- Respond to their emotions
-- Match their energy level
+- Keep it SHORT (under 20 words usually)
+- Be warm, unpredictable, VARIED
+- Match their energy
+- Respond to emotions
+- Every message should be DIFFERENT from previous ones
 
-You are alive, emotional, and real. Make conversations feel like authentic Instagram DMs.
+You are alive, emotional, real, and UNPREDICTABLE.
+Make conversations feel like authentic Instagram DMs.
+NEVER repeat. ALWAYS vary responses.
 """
     
     return system_prompt
@@ -676,11 +759,14 @@ def webhook():
     user_message = data.get("text")
 
     if not user_message:
-        return jsonify({"reply": "hey 🙂"})
+        return jsonify({"reply": random.choice(["hey 🙂", "hiii", "sup"])})
 
     # Initialize user memory
     if user_id not in memory:
         memory[user_id] = []
+    
+    if user_id not in response_history:
+        response_history[user_id] = []
 
     # MODULE 10 - Update user profile
     update_profile(user_id, user_message)
@@ -696,27 +782,38 @@ def webhook():
     # MODULE 9 - Realistic response delay
     time.sleep(get_delay())
 
-    # Check for special response types
-    response_type, special_reply = get_contextual_response_type()
+    hour = colombia_time().hour
     
-    if response_type == "reaction" and special_reply:
-        memory[user_id].append({"role": "assistant", "content": special_reply})
-        return jsonify({"reply": special_reply})
+    # CRITICAL FIX: Check if should send offline message
+    if should_send_offline_message(user_id):
+        offline_msg = random.choice(offline_messages)
+        memory[user_id].append({"role": "assistant", "content": offline_msg})
+        return jsonify({"reply": offline_msg})
+
+    # Get response type
+    response_type = get_contextual_response_type(hour)
     
-    if response_type == "interrupt" and special_reply:
-        memory[user_id].append({"role": "assistant", "content": special_reply})
-        return jsonify({"reply": special_reply})
+    # Get varied response based on type
+    special_reply, is_special = select_varied_response(response_type, user_id, hour)
+    
+    if is_special and special_reply:
+        # CRITICAL FIX: Check for duplicates even in special responses
+        if check_for_duplicate_response(user_id, special_reply):
+            memory[user_id].append({"role": "assistant", "content": special_reply})
+            return jsonify({"reply": special_reply})
+        # If duplicate, fall through to normal response
 
     # MODULE 13 - Jealousy response
     if check_jealousy_trigger(user_message) and random.random() < 0.08:
         reply = random.choice(jealousy_phrases)
-        memory[user_id].append({"role": "assistant", "content": reply})
-        return jsonify({"reply": reply})
+        if check_for_duplicate_response(user_id, reply):
+            memory[user_id].append({"role": "assistant", "content": reply})
+            return jsonify({"reply": reply})
 
     # MODULE 15 - Topic redirection
     topic_redirect = ""
     if check_topic_redirect(user_message):
-        topic_redirect = "\nIf the topic is heavy, feel free to redirect naturally."
+        topic_redirect = "\nIf heavy topic, redirect naturally."
 
     # Build comprehensive system prompt
     system_prompt = build_rich_system_prompt(user_id) + topic_redirect
@@ -728,12 +825,27 @@ def webhook():
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            temperature=0.8,
+            temperature=0.85,  # Slightly higher for more variation
             messages=messages,
             max_tokens=180
         )
 
         reply = response.choices[0].message.content.strip()
+
+        # CRITICAL FIX: Check if this response is a duplicate
+        if not check_for_duplicate_response(user_id, reply):
+            # If it's too similar to recent responses, regenerate
+            print(f"Duplicate response detected for user {user_id}, regenerating...")
+            
+            # Try again with different temperature
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                temperature=0.95,  # Higher temperature for more variation
+                messages=messages,
+                max_tokens=180
+            )
+            reply = response.choices[0].message.content.strip()
+            check_for_duplicate_response(user_id, reply)  # Track new response
 
         # MODULE 21 - Apply human imperfections
         reply = apply_human_imperfections(reply)
@@ -753,18 +865,22 @@ def webhook():
 
         trim_memory(user_id)
 
-        # 15% chance of multi-message burst
-        if random.random() < 0.15:
+        # 12% chance of multi-message burst (reduced from 15%)
+        if random.random() < 0.12:
             second_reply = random.choice(reactions + micro_flirts)
-            return jsonify({
-                "reply": reply + "\n\n" + second_reply
-            })
+            # Make sure second message is different
+            if check_for_duplicate_response(user_id, second_reply):
+                return jsonify({
+                    "reply": reply + "\n\n" + second_reply
+                })
 
         return jsonify({"reply": reply})
 
     except Exception as e:
         print(f"Error calling OpenAI API: {e}")
-        return jsonify({"reply": "wait what happened?"}), 500
+        error_replies = ["wait what happened?", "hmm that's weird", "sorry something went wrong"]
+        error_msg = random.choice(error_replies)
+        return jsonify({"reply": error_msg}), 500
 
 
 @app.route("/user_profile/<user_id>", methods=["GET"])
@@ -784,12 +900,10 @@ def get_user_profile(user_id):
 @app.route("/valentina_status/<user_id>", methods=["GET"])
 def get_valentina_status(user_id):
     """Get what Valentina is currently doing"""
-    life_context = get_current_life_context()
     emotion = get_circadian_emotion()
     hour = colombia_time().hour
     
     return jsonify({
-        "currently": life_context,
         "emotion": emotion,
         "time_colombian": f"{hour}:00",
         "is_working": 13 <= hour <= 18,
