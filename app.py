@@ -438,10 +438,10 @@ def chat():
     user_message = data.get("message")
     
     if not user_id:
-    user_id = "test_user"
+        user_id = "test_user"
 
-if not user_message:
-    user_message = "hello"
+    if not user_message:
+        user_message = "hello"
     
     # ── BANNED USER CHECK ──────────────────────────
     banned = load_banned()
