@@ -359,7 +359,7 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
     max_tokens=300
 )
 
-greeting = response.choices[0].message.content
+        greeting = response.choices[0].message.content
         conversation_history.append({"role": "assistant", "content": greeting})
         
         user_conversations[user_id] = conversation_history
@@ -393,7 +393,7 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
     max_tokens=350
 )
 
-reply = response.choices[0].message.content
+    reply = response.choices[0].message.content
     conversation_history.append({"role": "assistant", "content": reply})
     
     # Keep last 40 turns in memory (20 exchanges)
