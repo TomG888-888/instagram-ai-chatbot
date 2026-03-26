@@ -338,7 +338,7 @@ def get_time_context() -> str:
     
     return f"{day}, {mood}"
 
-def init_conversation(user_id: str, client: Anthropic) -> list:
+def init_conversation(user_id: str, client: OpenAI) -> list:
     """Initialize new conversation with opening greeting"""
     if user_id not in user_conversations:
         conversation_history = []
@@ -350,20 +350,23 @@ def init_conversation(user_id: str, client: Anthropic) -> list:
         )
         conversation_history.append({"role": "user", "content": opening})
         
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=300,
-            system=SYSTEM_PROMPT,
-            messages=conversation_history,
-        )
-        greeting = response.content[0].text
+        response = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[
+        {"role": "system", "content": SYSTEM_PROMPT},
+        *conversation_history
+    ],
+    max_tokens=300
+)
+
+greeting = response.choices[0].message.content
         conversation_history.append({"role": "assistant", "content": greeting})
         
         user_conversations[user_id] = conversation_history
     
     return user_conversations[user_id]
 
-def get_valentina_reply(user_id: str, user_message: str, client: Anthropic) -> str:
+def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
     """Get Valentina's reply to user message"""
     
     # Get or create conversation
@@ -381,14 +384,16 @@ def get_valentina_reply(user_id: str, user_message: str, client: Anthropic) -> s
     conversation_history.append({"role": "user", "content": msg})
     
     # Get response
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=350,
-        system=SYSTEM_PROMPT,
-        messages=conversation_history,
-    )
-    
-    reply = response.content[0].text
+    response = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[
+        {"role": "system", "content": SYSTEM_PROMPT},
+        *conversation_history
+    ],
+    max_tokens=350
+)
+
+reply = response.choices[0].message.content
     conversation_history.append({"role": "assistant", "content": reply})
     
     # Keep last 40 turns in memory (20 exchanges)
@@ -504,7 +509,7 @@ def start_chat():
         }), 403
     
     try:
-        client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         conversation = init_conversation(user_id, client)
         greeting = conversation[-1]["content"]  # Get last assistant message
         
