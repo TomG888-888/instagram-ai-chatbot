@@ -351,13 +351,13 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
         conversation_history.append({"role": "user", "content": opening})
         
         response = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[
-        {"role": "system", "content": SYSTEM_PROMPT},
-        *conversation_history
-    ],
-    max_tokens=300
-)
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                *conversation_history
+            ],
+            max_tokens=300
+        )
 
         greeting = response.choices[0].message.content
         conversation_history.append({"role": "assistant", "content": greeting})
@@ -385,13 +385,13 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
     
     # Get response
     response = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[
-        {"role": "system", "content": SYSTEM_PROMPT},
-        *conversation_history
-    ],
-    max_tokens=350
-)
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            *conversation_history
+        ],
+        max_tokens=350
+    )
 
     reply = response.choices[0].message.content
     conversation_history.append({"role": "assistant", "content": reply})
