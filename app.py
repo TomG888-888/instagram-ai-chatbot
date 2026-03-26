@@ -8,7 +8,7 @@ Run:      export ANTHROPIC_API_KEY="sk-..."
 """
 
 from flask import Flask, request, jsonify
-from anthropic import Anthropic
+from openai import OpenAI
 import datetime
 import random
 import time
@@ -456,7 +456,7 @@ def chat():
     # ─────────────────────────────────────────────
     
     try:
-        client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         
         # Initialize if first message
         if user_id not in user_conversations:
