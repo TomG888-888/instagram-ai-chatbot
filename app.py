@@ -314,7 +314,19 @@ Stay in character as Valentina Reyes. Always.
 #  DATA STORAGE (in-memory for now, can use database)
 # ══════════════════════════════════════════════
 
-user_conversations = {}  # {user_id: conversation_history}
+CONV_FILE = "conversations.json"
+
+def load_conversations():
+    if os.path.exists(CONV_FILE):
+        with open(CONV_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def save_conversations(data):
+    with open(CONV_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+
+user_conversations = load_conversations()
 
 # ══════════════════════════════════════════════
 #  HELPERS
@@ -342,6 +354,7 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
     """Initialize new conversation with opening greeting"""
     if user_id not in user_conversations:
         conversation_history = []
+              save_conversations(user_conversations)
         
         # Get opening greeting from Valentina
         opening = (
@@ -376,7 +389,7 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
     conversation_history = user_conversations[user_id]
     
     # Inject time context occasionally (15%)
-    msg = user_message
+    msg = f"User just said: '{user_message}'. Respond directly to this message."
     if random.random() < 0.15:
         msg += f"  [context: {get_time_context()}]"
     
@@ -394,11 +407,18 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
     )
 
     reply = response.choices[0].message.content
+          # анти-дубль ответа
+last_assistant = [m["content"] for m in conversation_history if m["role"] == "assistant"]
+
+if len(last_assistant) >= 1 and reply == last_assistant[-1]:
+    reply = reply + " 😅"
     conversation_history.append({"role": "assistant", "content": reply})
+          save_conversations(user_conversations)
     
     # Keep last 40 turns in memory (20 exchanges)
     if len(conversation_history) > 40:
         user_conversations[user_id] = conversation_history[-40:]
+              save_conversations(user_conversations)
     
     return reply
 
