@@ -366,8 +366,9 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                *conversation_history
-            ],
+                *conversation_history[:-1],
+                {"role": "user", "content": msg}
+            ]
             max_tokens=300
         )
 
