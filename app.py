@@ -390,7 +390,7 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
             {"role": "system", "content": SYSTEM_PROMPT},
             *conversation_history
         ],
-        max_tokens=350
+        max_tokens=300
     )
 
     reply = response.choices[0].message.content
@@ -474,18 +474,24 @@ def chat():
         reply = get_valentina_reply(user_id, user_message, client)
         
         return jsonify({
-            "reply": reply,
-            "status": "ok",
-            "user_id": user_id,
-            "timestamp": datetime.datetime.now().isoformat()
-        }), 200
+            "version": "v2",
+            "content": {
+                "messages": [
+                    {"text": reply}
+                ]
+            }
+         }), 200
     
     except Exception as e:
         print(f"Error: {e}")
         return jsonify({
-            "error": str(e),
-            "status": "error"
-        }), 500
+            "version": "v2",
+            "content": {
+                "messages": [
+                    {"text": "sorry... something went wrong 😅"}
+                ]
+            }
+        }), 200
 
 @app.route("/start", methods=["POST"])
 def start_chat():
