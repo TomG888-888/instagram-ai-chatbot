@@ -394,7 +394,7 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
         msg += f"  [context: {get_time_context()}]"
     
     # Add user message
-    conversation_history.append({"role": "user", "content": msg})
+    conversation_history.append({"role": "user", "content": user_message})
     
     # Get response
     response = client.chat.completions.create(
@@ -413,11 +413,12 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
     last_assistant = [m["content"] for m in conversation_history if m["role"] == "assistant"]
 
     if len(last_assistant) >= 1 and reply.strip().lower() == last_assistant[-1].strip().lower():
-              if len(last_assistant) >= 2 and reply.strip().lower() in [
-                  m.strip().lower() for m in last_assistant[-2:]
-              ]:
-                  reply = reply + " haha"
         reply = reply + " 😅"
+
+    if len(last_assistant) >= 2 and reply.strip().lower() in [
+        m.strip().lower() for m in last_assistant[-2:]
+    ]:
+        reply = reply + " haha"
     conversation_history.append({"role": "assistant", "content": reply})
     save_conversations(user_conversations)
     
