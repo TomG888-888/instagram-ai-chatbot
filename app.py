@@ -375,6 +375,7 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
         conversation_history.append({"role": "assistant", "content": greeting})
         
         user_conversations[user_id] = conversation_history
+        save_conversations(user_conversations)
     
     return user_conversations[user_id]
 
@@ -411,7 +412,11 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
           
     last_assistant = [m["content"] for m in conversation_history if m["role"] == "assistant"]
 
-    if len(last_assistant) >= 1 and reply == last_assistant[-1]:
+    if len(last_assistant) >= 1 and reply.strip().lower() == last_assistant[-1].strip().lower():
+              if len(last_assistant) >= 2 and reply.strip().lower() in [
+                  m.strip().lower() for m in last_assistant[-2:]
+              ]:
+                  reply = reply + " haha"
         reply = reply + " 😅"
     conversation_history.append({"role": "assistant", "content": reply})
     save_conversations(user_conversations)
