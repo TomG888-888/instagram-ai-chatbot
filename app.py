@@ -368,7 +368,7 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 *conversation_history[:-1],
                 {"role": "user", "content": msg}
-            ]
+            ],
             max_tokens=300
         )
 
@@ -402,10 +402,9 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
-            *conversation_history[:-1],
-            {"role": "user", "content": msg}
-        ]
-        max_tokens=300
+            *conversation_history
+        ],
+     max_tokens=300
     )
 
     reply = response.choices[0].message.content
