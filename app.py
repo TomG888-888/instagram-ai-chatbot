@@ -354,7 +354,6 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
     """Initialize new conversation with opening greeting"""
     if user_id not in user_conversations:
         conversation_history = []
-              save_conversations(user_conversations)
         
         # Get opening greeting from Valentina
         opening = (
@@ -407,18 +406,20 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
     )
 
     reply = response.choices[0].message.content
-          # анти-дубль ответа
-last_assistant = [m["content"] for m in conversation_history if m["role"] == "assistant"]
+          
+    # анти-дубль ответа
+          
+    last_assistant = [m["content"] for m in conversation_history if m["role"] == "assistant"]
 
-if len(last_assistant) >= 1 and reply == last_assistant[-1]:
-    reply = reply + " 😅"
+    if len(last_assistant) >= 1 and reply == last_assistant[-1]:
+        reply = reply + " 😅"
     conversation_history.append({"role": "assistant", "content": reply})
-          save_conversations(user_conversations)
+    save_conversations(user_conversations)
     
     # Keep last 40 turns in memory (20 exchanges)
     if len(conversation_history) > 40:
         user_conversations[user_id] = conversation_history[-40:]
-              save_conversations(user_conversations)
+        save_conversations(user_conversations)
     
     return reply
 
