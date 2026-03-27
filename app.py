@@ -361,13 +361,12 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
             "This is the very first message. Write a short, natural opening greeting as Valentina.]"
         )
         conversation_history.append({"role": "user", "content": opening})
-        
+
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                *conversation_history[:-1],
-                {"role": "user", "content": msg}
+                *conversation_history
             ],
             max_tokens=300
         )
