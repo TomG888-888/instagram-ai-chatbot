@@ -402,7 +402,7 @@ def process_buffer(user_id):
         requests.post(
             "https://api.manychat.com/fb/sending/sendContent",
             headers={
-                "Authorization": "Bearer YOUR_MANYCHAT_TOKEN",
+                "Authorization": "Bearer 3671407:5c8d462b25b61b060ccb6e0d2867a4c8",
                 "Content-Type": "application/json"
             },
             json={
@@ -550,8 +550,7 @@ def chat():
     try:
        
         if user_id not in user_conversations:
-            init_conversation(user_id, client)
-        
+            init_conversation(user_id, OpenAI(api_key=os.getenv("OPENAI_API_KEY")))             
         # Get Valentina's reply
         # добавляем сообщение в буфер
         if user_id not in message_buffer:
