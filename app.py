@@ -20,6 +20,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+# BUFFER (объединение сообщений)
+message_buffer = {}
 
 # ══════════════════════════════════════════════
 #  BAN SYSTEM
@@ -389,7 +391,20 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
     conversation_history = user_conversations[user_id]
     
     # Inject time context occasionally (15%)
-    msg = f"User just said: '{user_message}'. Respond directly to this message."
+    msg = f"""
+    User sent multiple messages:
+
+    {user_message}
+
+    Your task:
+    - Choose ONLY ONE idea to respond to
+    - Ignore other parts if you want
+    - If messages repeat — react differently (not same answer)
+    - You can change topic
+    - You are NOT required to answer everything
+
+    Respond naturally.
+    """
     if random.random() < 0.15:
         msg += f"  [context: {get_time_context()}]"
     
@@ -409,7 +424,14 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
     reply = response.choices[0].message.content
           
     # анти-дубль ответа
-          
+    # если пользователь повторяется — меняем стиль ответа
+    if len(conversation_history) >= 2:
+        last_user_msgs = [
+            m["content"] for m in conversation_history if m["role"] == "user"
+        ][-2:]
+    
+        if len(last_user_msgs) == 2 and last_user_msgs[0].strip().lower() == last_user_msgs[1].strip().lower():
+            reply += " haha you already asked that"      
     last_assistant = [m["content"] for m in conversation_history if m["role"] == "assistant"]
 
     if len(last_assistant) >= 1 and reply.strip().lower() == last_assistant[-1].strip().lower():
@@ -463,6 +485,12 @@ def chat():
     
     user_id = data.get("user_id")
     user_message = data.get("message")
+
+          # сохраняем сообщения пользователя
+       if user_id not in message_buffer:
+           message_buffer[user_id] = []
+
+       message_buffer[user_id].append(user_message)
     
     if not user_id:
         user_id = "test_user"
@@ -498,16 +526,19 @@ def chat():
             init_conversation(user_id, client)
         
         # Get Valentina's reply
-        reply = get_valentina_reply(user_id, user_message, client)
+        # объединяем все сообщения
+        messages = message_buffer.get(user_id, [])
+        combined_message = ". ".join(messages)
+
+        # очищаем буфер
+        message_buffer[user_id] = []
+
+        # отправляем объединённое сообщение
+        reply = get_valentina_reply(user_id, combined_message, client)
         
         return jsonify({
-            "version": "v2",
-            "content": {
-                "messages": [
-                    {"text": reply}
-                ]
-            }
-         }), 200
+            "text": reply
+        }), 200
     
     except Exception as e:
         print(f"Error: {e}")
