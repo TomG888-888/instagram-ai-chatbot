@@ -421,7 +421,7 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
     
     # Get or create conversation
     if user_id not in user_conversations:
-        init_conversation(user_id, client)
+        init_conversation(user_id, OpenAI(api_key=os.getenv("OPENAI_API_KEY")))
     
     conversation_history = user_conversations[user_id]
     
