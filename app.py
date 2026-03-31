@@ -22,6 +22,8 @@ load_dotenv()
 app = Flask(__name__)
 # BUFFER (объединение сообщений)
 message_buffer = {}
+message_timers = {}
+BUFFER_DELAY = 4  # секунд
 
 # ══════════════════════════════════════════════
 #  BAN SYSTEM
@@ -409,7 +411,7 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
         msg += f"  [context: {get_time_context()}]"
     
     # Add user message
-    conversation_history.append({"role": "user", "content": user_message})
+    conversation_history.append({"role": "user", "content": msg})
     
     # Get response
     response = client.chat.completions.create(
@@ -487,10 +489,10 @@ def chat():
     user_message = data.get("message")
 
           # сохраняем сообщения пользователя
-       if user_id not in message_buffer:
-           message_buffer[user_id] = []
+    if user_id not in message_buffer:
+        message_buffer[user_id] = []
 
-       message_buffer[user_id].append(user_message)
+    message_buffer[user_id].append(user_message)
     
     if not user_id:
         user_id = "test_user"
@@ -543,12 +545,7 @@ def chat():
     except Exception as e:
         print(f"Error: {e}")
         return jsonify({
-            "version": "v2",
-            "content": {
-                "messages": [
-                    {"text": "sorry... something went wrong 😅"}
-                ]
-            }
+            "text": "sorry... something went wrong 😅"
         }), 200
 
 @app.route("/start", methods=["POST"])
