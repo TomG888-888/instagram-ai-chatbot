@@ -384,16 +384,14 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
         save_conversations(user_conversations)
     
     return user_conversations[user_id]
-
-def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
-          def process_buffer(user_id):
+def process_buffer(user_id):
     messages = message_buffer.get(user_id, [])
     if not messages:
         return
 
     combined = ". ".join(messages)
 
-    # очищаем
+    # очистка
     message_buffer[user_id] = []
     message_timers[user_id] = None
 
@@ -401,7 +399,6 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         reply = get_valentina_reply(user_id, combined, client)
 
-        # отправка в ManyChat
         requests.post(
             "https://api.manychat.com/fb/sending/sendContent",
             headers={
@@ -418,6 +415,8 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
 
     except Exception as e:
         print("Buffer error:", e)
+def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
+          
     """Get Valentina's reply to user message"""
     
     # Get or create conversation
@@ -521,12 +520,6 @@ def chat():
     
     user_id = data.get("user_id")
     user_message = data.get("message")
-
-          # сохраняем сообщения пользователя
-    if user_id not in message_buffer:
-        message_buffer[user_id] = []
-
-    message_buffer[user_id].append(user_message)
     
     if not user_id:
         user_id = "test_user"
