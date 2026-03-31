@@ -15,6 +15,8 @@ import time
 import json
 import os
 import re
+import threading
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -384,6 +386,38 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
     return user_conversations[user_id]
 
 def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
+          def process_buffer(user_id):
+    messages = message_buffer.get(user_id, [])
+    if not messages:
+        return
+
+    combined = ". ".join(messages)
+
+    # очищаем
+    message_buffer[user_id] = []
+    message_timers[user_id] = None
+
+    try:
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        reply = get_valentina_reply(user_id, combined, client)
+
+        # отправка в ManyChat
+        requests.post(
+            "https://api.manychat.com/fb/sending/sendContent",
+            headers={
+                "Authorization": "Bearer YOUR_MANYCHAT_TOKEN",
+                "Content-Type": "application/json"
+            },
+            json={
+                "subscriber_id": user_id,
+                "data": {
+                    "text": reply
+                }
+            }
+        )
+
+    except Exception as e:
+        print("Buffer error:", e)
     """Get Valentina's reply to user message"""
     
     # Get or create conversation
@@ -528,19 +562,22 @@ def chat():
             init_conversation(user_id, client)
         
         # Get Valentina's reply
-        # объединяем все сообщения
-        messages = message_buffer.get(user_id, [])
-        combined_message = ". ".join(messages)
+        # добавляем сообщение в буфер
+        if user_id not in message_buffer:
+            message_buffer[user_id] = []
 
-        # очищаем буфер
-        message_buffer[user_id] = []
+        message_buffer[user_id].append(user_message)
 
-        # отправляем объединённое сообщение
-        reply = get_valentina_reply(user_id, combined_message, client)
-        
-        return jsonify({
-            "text": reply
-        }), 200
+        # если уже есть таймер → просто выходим
+        if user_id in message_timers and message_timers[user_id]:
+            return jsonify({"text": ""}), 200
+
+        # запускаем таймер
+        timer = threading.Timer(BUFFER_DELAY, process_buffer, args=[user_id])
+        message_timers[user_id] = timer
+        timer.start()
+
+        return jsonify({"text": ""}), 200
     
     except Exception as e:
         print(f"Error: {e}")
