@@ -548,9 +548,7 @@ def chat():
     # ─────────────────────────────────────────────
     
     try:
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        
-        # Initialize if first message
+       
         if user_id not in user_conversations:
             init_conversation(user_id, client)
         
