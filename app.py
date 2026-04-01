@@ -558,9 +558,9 @@ def chat():
 
         message_buffer[user_id].append(user_message)
 
-        # если уже есть таймер → просто выходим
+        # если есть таймер — СБРАСЫВАЕМ его
         if user_id in message_timers and message_timers[user_id]:
-            return jsonify({"text": ""}), 200
+            message_timers[user_id].cancel()
 
         # запускаем таймер
         timer = threading.Timer(BUFFER_DELAY, process_buffer, args=[user_id])
