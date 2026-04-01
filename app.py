@@ -385,6 +385,11 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
     
     return user_conversations[user_id]
 def process_buffer(user_id):
+    # если таймер уже перезаписан — выходим (анти-дубль)
+    current_timer = message_timers.get(user_id)
+    if current_timer is None:
+        return
+
     messages = message_buffer.get(user_id, [])
     if not messages:
         return
@@ -458,6 +463,22 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
 
     reply = response.choices[0].message.content
           
+    # жёсткий анти-повтор
+    last_assistant = [
+        m["content"].strip().lower()
+        for m in conversation_history
+        if m["role"] == "assistant"
+    ]
+
+    if reply.strip().lower() in last_assistant[-5:]:
+        variations = [
+            "haha wait i already said that",
+            "lol i'm repeating myself",
+            "ok ignore that 😂",
+            "i sound weird today haha",
+            "anyway... tell me something about you"
+        ]
+        reply = random.choice(variations)      
     # анти-дубль ответа
     # если пользователь повторяется — меняем стиль ответа
     if len(conversation_history) >= 2:
