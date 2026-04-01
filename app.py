@@ -501,7 +501,7 @@ def index():
         "features": ["ban_system", "modules_1_40", "circadian_rhythm"]
     }), 200
 
-@app.route("/chat", methods=["POST"])
+@app.route("/webhook", methods=["POST"])
 def chat():
     """
     Main chat endpoint
