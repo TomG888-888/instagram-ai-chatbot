@@ -386,12 +386,8 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
     
     return user_conversations[user_id]
 def process_buffer(user_id, msg_id):
-          # если это не последний таймер — игнор
+    # игнор старых таймеров
     if message_ids.get(user_id) != msg_id:
-        return
-    # если таймер уже перезаписан — выходим (анти-дубль)
-    current_timer = message_timers.get(user_id)
-    if current_timer is None:
         return
 
     messages = message_buffer.get(user_id, [])
@@ -403,6 +399,7 @@ def process_buffer(user_id, msg_id):
     # очистка
     message_buffer[user_id] = []
     message_timers[user_id] = None
+    message_ids[user_id] = None
 
     try:
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -588,7 +585,7 @@ def chat():
             message_timers[user_id].cancel()
 
         # запускаем таймер
-        msg_id = time.time()
+        msg_id = str(time.time())
         message_ids[user_id] = msg_id
 
         timer = threading.Timer(BUFFER_DELAY, process_buffer, args=[user_id, msg_id])
