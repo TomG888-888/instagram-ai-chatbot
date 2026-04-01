@@ -25,6 +25,7 @@ app = Flask(__name__)
 # BUFFER (объединение сообщений)
 message_buffer = {}
 message_timers = {}
+message_ids = {}
 BUFFER_DELAY = 4  # секунд
 
 # ══════════════════════════════════════════════
@@ -384,7 +385,10 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
         save_conversations(user_conversations)
     
     return user_conversations[user_id]
-def process_buffer(user_id):
+def process_buffer(user_id, msg_id):
+          # если это не последний таймер — игнор
+    if message_ids.get(user_id) != msg_id:
+        return
     # если таймер уже перезаписан — выходим (анти-дубль)
     current_timer = message_timers.get(user_id)
     if current_timer is None:
@@ -584,7 +588,10 @@ def chat():
             message_timers[user_id].cancel()
 
         # запускаем таймер
-        timer = threading.Timer(BUFFER_DELAY, process_buffer, args=[user_id])
+        msg_id = time.time()
+        message_ids[user_id] = msg_id
+
+        timer = threading.Timer(BUFFER_DELAY, process_buffer, args=[user_id, msg_id])
         message_timers[user_id] = timer
         timer.start()
 
