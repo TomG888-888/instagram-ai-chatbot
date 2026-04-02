@@ -495,7 +495,6 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
     
         if len(last_user_msgs) == 2 and last_user_msgs[0].strip().lower() == last_user_msgs[1].strip().lower():
             reply += " haha you already asked that"      
-    last_assistant = [m["content"] for m in conversation_history if m["role"] == "assistant"]
 
     if len(last_assistant) >= 1 and reply.strip().lower() == last_assistant[-1].strip().lower():
         reply = reply + " 😅"
