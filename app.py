@@ -579,10 +579,15 @@ def chat():
             message_buffer[user_id] = []
 
         # анти-дубль входящих сообщений
-        last_msgs = message_buffer.get(user_id, [])
+      last_msgs = message_buffer.get(user_id, [])
 
-        if last_msgs and last_msgs[-1].strip().lower() == user_message.strip().lower():
-            return jsonify({"text": ""}), 200
+      if last_msgs:
+          last = last_msgs[-1].strip().lower()
+          current = user_message.strip().lower()
+
+          # игнор только если прям подряд дубль
+          if current == last:
+              return jsonify({"text": ""}), 200
 
         message_buffer[user_id].append(user_message)
 
