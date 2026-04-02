@@ -402,13 +402,18 @@ def process_buffer(user_id, msg_id):
     message_ids[user_id] = None
 
     try:
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            print("ERROR: OPENAI_API_KEY missing")
+            return
+
+        client = OpenAI(api_key=api_key)
         reply = get_valentina_reply(user_id, combined, client)
 
         requests.post(
             "https://api.manychat.com/fb/sending/sendContent",
             headers={
-                "Authorization": "Bearer 3671407:5c8d462b25b61b060ccb6e0d2867a4c8",
+                "Authorization": f"Bearer {os.getenv('MANYCHAT_API_KEY')}",
                 "Content-Type": "application/json"
             },
             json={
@@ -416,7 +421,8 @@ def process_buffer(user_id, msg_id):
                 "data": {
                     "text": reply
                 }
-            }
+            },
+            timeout=5
         )
 
     except Exception as e:
@@ -572,21 +578,12 @@ def chat():
     try:
        
         if user_id not in user_conversations:
-            init_conversation(user_id, OpenAI(api_key=os.getenv("OPENAI_API_KEY")))             
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            init_conversation(user_id, client)      
         # Get Valentina's reply
         # добавляем сообщение в буфер
         if user_id not in message_buffer:
             message_buffer[user_id] = []
-
-        # анти-дубль
-        last_msgs = message_buffer.get(user_id, [])
-
-        if last_msgs:
-            last = last_msgs[-1].strip().lower()
-            current = user_message.strip().lower()
-
-            if current == last:
-                return jsonify({"text": ""}), 200
 
         message_buffer[user_id].append(user_message)
 
