@@ -599,28 +599,28 @@ def chat():
 @app.route("/start", methods=["POST"])
 def start_chat():
     data = request.get_json()
-         user_id = data.get("user_id") if data else None
+    user_id = data.get("user_id") if data else None
 
     if not user_id:
         return jsonify({"error": "Missing user_id"}), 400
 
-         banned = load_banned()
-         if is_banned(user_id, banned):
-             return jsonify({"status": "banned"}), 403
+    banned = load_banned()
+    if is_banned(user_id, banned):
+        return jsonify({"status": "banned"}), 403
 
-         try:
-             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-             conversation = init_conversation(user_id, client)
-             greeting = conversation[-1]["content"]
+    try:
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        conversation = init_conversation(user_id, client)
+        greeting = conversation[-1]["content"]
 
-             return jsonify({
-                 "reply": greeting,
-                 "status": "ok"
-             }), 200
+        return jsonify({
+            "reply": greeting,
+            "status": "ok"
+        }), 200
 
-         except Exception as e:
-             print("ERROR:", e)
-             return jsonify({"status": "error"}), 500
+     except Exception as e:
+         print("ERROR:", e)
+         return jsonify({"status": "error"}), 500
 
 @app.route("/status/<user_id>", methods=["GET"])
 def get_status(user_id):
