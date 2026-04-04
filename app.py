@@ -410,7 +410,7 @@ def process_buffer(user_id, msg_id):
         client = OpenAI(api_key=api_key)
         reply = get_valentina_reply(user_id, combined, client)
 
-        requests.post(
+        mc_response = requests.post(
             "https://api.manychat.com/fb/sending/sendContent",
             headers={
                 "Authorization": f"Bearer {os.getenv('MANYCHAT_API_KEY')}",
@@ -419,21 +419,37 @@ def process_buffer(user_id, msg_id):
             json={
                 "subscriber_id": user_id,
                 "data": {
-                    "text": reply
+                    "version": "v2",
+                    "content": {
+                        "messages": [
+                            {"type": "text", "text": reply}
+                        ]
+                    }
                 }
             },
             timeout=5
-        )
+         )
+         print("ManyChat status:", mc_response.status_code)
+         print("ManyChat body:", mc_response.text)
 
+    except requests.exceptions.Timeout:
+        print(f"[ERROR] ManyChat timeout for user {user_id}")
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] ManyChat request failed: {e}")
     except Exception as e:
-        print("Buffer error:", e)
+        import traceback
+        print(f"[ERROR] process_buffer crashed: {traceback.format_exc()}")
 def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
           
     """Get Valentina's reply to user message"""
     
     # Get or create conversation
     if user_id not in user_conversations:
-        init_conversation(user_id, OpenAI(api_key=os.getenv("OPENAI_API_KEY")))
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            print("[ERROR] OPENAI_API_KEY not set")
+            return jsonify({"text": ""}), 200
+        init_conversation(user_id, OpenAI(api_key=api_key))
     
     conversation_history = user_conversations[user_id]
     
@@ -584,6 +600,9 @@ def chat():
         if user_id not in message_buffer:
             message_buffer[user_id] = []
 
+        last_msgs = message_buffer.get(user_id, [])
+        if last_msgs and last_msgs[-1].strip().lower() == user_message.strip().lower():
+            return jsonify({"text": ""}), 200
         message_buffer[user_id].append(user_message)
 
         # если есть таймер — СБРАСЫВАЕМ его
