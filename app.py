@@ -15,7 +15,6 @@ import time
 import json
 import os
 import re
-import threading
 import requests
 from dotenv import load_dotenv
 
@@ -383,60 +382,6 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
     
     return user_conversations[user_id]
 
-    # игнор старых таймеров
-    if message_ids.get(user_id) != msg_id:
-        return
-
-    messages = message_buffer.get(user_id, [])
-    if not messages:
-        return
-
-    combined = ". ".join(messages)
-
-    # очистка
-    message_buffer[user_id] = []
-    message_timers[user_id] = None
-    message_ids[user_id] = None
-
-    try:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            print("ERROR: OPENAI_API_KEY missing")
-            return
-
-        client = OpenAI(api_key=api_key)
-        reply = get_valentina_reply(user_id, combined, client)
-
-        mc_response = requests.post(
-            "https://api.manychat.com/fb/sending/sendContent",
-            headers={
-                "Authorization": f"Bearer {os.getenv('MANYCHAT_API_KEY')}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "subscriber_id": user_id,
-                "message_tag": "HUMAN_AGENT",
-                "data": {
-                    "version": "v2",
-                    "content": {
-                        "messages": [
-                            {"type": "text", "text": reply}
-                        ]
-                    }
-                }
-            },
-            timeout=5
-        )
-        print("ManyChat status:", mc_response.status_code)
-        print("ManyChat body:", mc_response.text)
-
-    except requests.exceptions.Timeout:
-        print(f"[ERROR] ManyChat timeout for user {user_id}")
-    except requests.exceptions.RequestException as e:
-        print(f"[ERROR] ManyChat request failed: {e}")
-    except Exception as e:
-        import traceback
-        print(f"[ERROR] process_buffer crashed: {traceback.format_exc()}")
 def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
           
     """Get Valentina's reply to user message"""
@@ -624,10 +569,7 @@ def chat():
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
             init_conversation(user_id, client)      
         # Get Valentina's reply
-        # добавляем сообщение в буфер
-        if user_id not in message_buffer:
-            message_buffer[user_id] = []
-
+      
        # добавляем в буфер
        message_buffer.setdefault(user_id, [])
        message_buffer[user_id].append(user_message)
@@ -656,45 +598,29 @@ def chat():
 
 @app.route("/start", methods=["POST"])
 def start_chat():
-          data = request.get_json()
+         data = request.get_json()
+         user_id = data.get("user_id") if data else None
 
-          user_id = data.get("user_id") if data else "test_user"
-          user_message = data.get("message") if data else "hello"
+         if not user_id:
+             return jsonify({"error": "Missing user_id"}), 400
 
-          print("WEBHOOK:", user_id, user_message)
+         banned = load_banned()
+         if is_banned(user_id, banned):
+             return jsonify({"status": "banned"}), 403
 
-          banned = load_banned()
+         try:
+             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+             conversation = init_conversation(user_id, client)
+             greeting = conversation[-1]["content"]
 
-          if is_banned(user_id, banned):
-              return jsonify({"status": "banned"}), 403
+             return jsonify({
+                 "reply": greeting,
+                 "status": "ok"
+             }), 200
 
-          if is_toxic(user_message):
-              ban_user(user_id, banned)
-              return jsonify({"status": "banned"}), 403
-
-          # буфер
-          message_buffer.setdefault(user_id, [])
-          message_buffer[user_id].append(user_message)
-
-          # ⏳ РЕАЛИСТИЧНАЯ ЗАДЕРЖКА
-          delay = random.randint(2, 6)
-          time.sleep(delay)
-
-          # 🌙 НОЧНОЙ РЕЖИМ (иногда игнор)
-          hour = datetime.datetime.now().hour
-          if 2 <= hour <= 7 and random.random() < 0.6:
-              print("SLEEP MODE - skipping reply")
-              return jsonify({"text": ""}), 200
-
-          # объединяем сообщения
-          combined = ". ".join(message_buffer[user_id])
-          message_buffer[user_id] = []
-
-          print("PROCESS:", combined)
-
-          process_buffer_sync(user_id, combined)
-
-          return jsonify({"text": ""}), 200
+         except Exception as e:
+             print("ERROR:", e)
+             return jsonify({"status": "error"}), 500
     """
     Start a new chat session and get opening greeting
     
