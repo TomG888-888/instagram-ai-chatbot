@@ -618,9 +618,9 @@ def start_chat():
             "status": "ok"
         }), 200
 
-     except Exception as e:
-         print("ERROR:", e)
-         return jsonify({"status": "error"}), 500
+    except Exception as e:
+        print("ERROR:", e)
+        return jsonify({"status": "error"}), 500
 
 @app.route("/status/<user_id>", methods=["GET"])
 def get_status(user_id):
