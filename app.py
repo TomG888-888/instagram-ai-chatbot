@@ -418,6 +418,7 @@ def process_buffer(user_id, msg_id):
             },
             json={
                 "subscriber_id": user_id,
+                "message_tag": "HUMAN_AGENT",
                 "data": {
                     "version": "v2",
                     "content": {
