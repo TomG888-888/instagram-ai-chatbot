@@ -601,8 +601,8 @@ def start_chat():
     data = request.get_json()
          user_id = data.get("user_id") if data else None
 
-         if not user_id:
-             return jsonify({"error": "Missing user_id"}), 400
+    if not user_id:
+        return jsonify({"error": "Missing user_id"}), 400
 
          banned = load_banned()
          if is_banned(user_id, banned):
