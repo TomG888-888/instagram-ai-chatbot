@@ -426,11 +426,11 @@ def process_buffer(user_id, msg_id):
                         ]
                     }
                 }
-             },
-             timeout=5
-         )
-         print("ManyChat status:", mc_response.status_code)
-         print("ManyChat body:", mc_response.text)
+            },
+            timeout=5
+        )
+        print("ManyChat status:", mc_response.status_code)
+        print("ManyChat body:", mc_response.text)
 
     except requests.exceptions.Timeout:
         print(f"[ERROR] ManyChat timeout for user {user_id}")
