@@ -570,25 +570,25 @@ def chat():
             init_conversation(user_id, client)      
         # Get Valentina's reply
       
-       # добавляем в буфер
-       message_buffer.setdefault(user_id, [])
-       message_buffer[user_id].append(user_message)
+        # добавляем в буфер
+        message_buffer.setdefault(user_id, [])
+        message_buffer[user_id].append(user_message)
 
-       print("WEBHOOK:", user_id, user_message)
+        print("WEBHOOK:", user_id, user_message)
 
-       # задержка
-       delay = random.randint(2, 5)
-       time.sleep(delay)
+        # задержка
+        delay = random.randint(2, 5)
+        time.sleep(delay)
 
-       # объединяем
-       combined = ". ".join(message_buffer[user_id])
-       message_buffer[user_id] = []
+        # объединяем
+        combined = ". ".join(message_buffer[user_id])
+        message_buffer[user_id] = []
 
-       print("PROCESS:", combined)
+        print("PROCESS:", combined)
 
-       process_buffer_sync(user_id, combined)
+        process_buffer_sync(user_id, combined)
 
-       return jsonify({"text": ""}), 200
+        return jsonify({"text": ""}), 200
     
     except Exception as e:
         print(f"Error: {e}")
@@ -623,37 +623,6 @@ def start_chat():
              return jsonify({"status": "error"}), 500
     """
     Start a new chat session and get opening greeting
-    
-    Expected JSON:
-    {
-        "user_id": "unique_user_identifier"
-    }
-    """
-    
-    data = request.get_json()
-    user_id = data.get("user_id") if data else None
-    
-    if not user_id:
-        return jsonify({"error": "Missing user_id"}), 400
-    
-    banned = load_banned()
-    if is_banned(user_id, banned):
-        return jsonify({
-            "reply": "fuck off",
-            "status": "banned"
-        }), 403
-    
-    try:
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        conversation = init_conversation(user_id, client)
-        greeting = conversation[-1]["content"]  # Get last assistant message
-        
-        return jsonify({
-            "reply": greeting,
-            "status": "ok",
-            "user_id": user_id,
-            "timestamp": datetime.datetime.now().isoformat()
-        }), 200
     
     except Exception as e:
         print(f"Error: {e}")
