@@ -426,8 +426,8 @@ def process_buffer(user_id, msg_id):
                         ]
                     }
                 }
-            },
-            timeout=5
+             },
+             timeout=5
          )
          print("ManyChat status:", mc_response.status_code)
          print("ManyChat body:", mc_response.text)
@@ -448,7 +448,7 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             print("[ERROR] OPENAI_API_KEY not set")
-            return jsonify({"text": ""}), 200
+            return "..."
         init_conversation(user_id, OpenAI(api_key=api_key))
     
     conversation_history = user_conversations[user_id]
