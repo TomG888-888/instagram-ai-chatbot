@@ -628,10 +628,25 @@ def chat():
         if user_id not in message_buffer:
             message_buffer[user_id] = []
 
-        last_msgs = message_buffer.get(user_id, [])
-        message_buffer[user_id].append(user_message)
+       # добавляем в буфер
+       message_buffer.setdefault(user_id, [])
+       message_buffer[user_id].append(user_message)
 
-        return jsonify({"text": ""}), 200
+       print("WEBHOOK:", user_id, user_message)
+
+       # задержка
+       delay = random.randint(2, 5)
+       time.sleep(delay)
+
+       # объединяем
+       combined = ". ".join(message_buffer[user_id])
+       message_buffer[user_id] = []
+
+       print("PROCESS:", combined)
+
+       process_buffer_sync(user_id, combined)
+
+       return jsonify({"text": ""}), 200
     
     except Exception as e:
         print(f"Error: {e}")
