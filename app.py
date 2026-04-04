@@ -24,9 +24,6 @@ load_dotenv()
 app = Flask(__name__)
 # BUFFER (объединение сообщений)
 message_buffer = {}
-message_timers = {}
-message_ids = {}
-BUFFER_DELAY = 4  # секунд
 
 # ══════════════════════════════════════════════
 #  BAN SYSTEM
@@ -385,7 +382,7 @@ def init_conversation(user_id: str, client: OpenAI) -> list:
         save_conversations(user_conversations)
     
     return user_conversations[user_id]
-def process_buffer(user_id, msg_id):
+
     # игнор старых таймеров
     if message_ids.get(user_id) != msg_id:
         return
@@ -530,6 +527,36 @@ def get_valentina_reply(user_id: str, user_message: str, client: OpenAI) -> str:
     
     return reply
 
+def process_buffer_sync(user_id, combined):
+    try:
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        reply = get_valentina_reply(user_id, combined, client)
+
+        requests.post(
+            "https://api.manychat.com/fb/sending/sendContent",
+            headers={
+                "Authorization": f"Bearer {os.getenv('MANYCHAT_API_KEY')}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "subscriber_id": user_id,
+                "data": {
+                    "version": "v2",
+                    "content": {
+                        "messages": [
+                            {"type": "text", "text": reply}
+                        ]
+                    }
+                }
+            },
+            timeout=10
+        )
+
+        print("REPLIED:", reply)
+
+    except Exception as e:
+        print("ERROR:", e)
+
 # ══════════════════════════════════════════════
 #  FLASK ROUTES
 # ══════════════════════════════════════════════
@@ -602,21 +629,7 @@ def chat():
             message_buffer[user_id] = []
 
         last_msgs = message_buffer.get(user_id, [])
-        if last_msgs and last_msgs[-1].strip().lower() == user_message.strip().lower():
-            return jsonify({"text": ""}), 200
         message_buffer[user_id].append(user_message)
-
-        # если есть таймер — СБРАСЫВАЕМ его
-        if user_id in message_timers and message_timers[user_id]:
-            message_timers[user_id].cancel()
-
-        # запускаем таймер
-        msg_id = str(time.time())
-        message_ids[user_id] = msg_id
-
-        timer = threading.Timer(BUFFER_DELAY, process_buffer, args=[user_id, msg_id])
-        message_timers[user_id] = timer
-        timer.start()
 
         return jsonify({"text": ""}), 200
     
@@ -628,6 +641,45 @@ def chat():
 
 @app.route("/start", methods=["POST"])
 def start_chat():
+          data = request.get_json()
+
+          user_id = data.get("user_id") if data else "test_user"
+          user_message = data.get("message") if data else "hello"
+
+          print("WEBHOOK:", user_id, user_message)
+
+          banned = load_banned()
+
+          if is_banned(user_id, banned):
+              return jsonify({"status": "banned"}), 403
+
+          if is_toxic(user_message):
+              ban_user(user_id, banned)
+              return jsonify({"status": "banned"}), 403
+
+          # буфер
+          message_buffer.setdefault(user_id, [])
+          message_buffer[user_id].append(user_message)
+
+          # ⏳ РЕАЛИСТИЧНАЯ ЗАДЕРЖКА
+          delay = random.randint(2, 6)
+          time.sleep(delay)
+
+          # 🌙 НОЧНОЙ РЕЖИМ (иногда игнор)
+          hour = datetime.datetime.now().hour
+          if 2 <= hour <= 7 and random.random() < 0.6:
+              print("SLEEP MODE - skipping reply")
+              return jsonify({"text": ""}), 200
+
+          # объединяем сообщения
+          combined = ". ".join(message_buffer[user_id])
+          message_buffer[user_id] = []
+
+          print("PROCESS:", combined)
+
+          process_buffer_sync(user_id, combined)
+
+          return jsonify({"text": ""}), 200
     """
     Start a new chat session and get opening greeting
     
