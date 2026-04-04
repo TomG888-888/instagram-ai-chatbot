@@ -427,7 +427,6 @@ def process_buffer(user_id, msg_id):
                     }
                 }
             },
-            "message_tag": "HUMAN_AGENT",
             timeout=5
         )
         print("ManyChat status:", mc_response.status_code)
