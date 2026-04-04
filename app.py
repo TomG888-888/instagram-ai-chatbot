@@ -598,7 +598,7 @@ def chat():
 
 @app.route("/start", methods=["POST"])
 def start_chat():
-         data = request.get_json()
+    data = request.get_json()
          user_id = data.get("user_id") if data else None
 
          if not user_id:
@@ -621,12 +621,6 @@ def start_chat():
          except Exception as e:
              print("ERROR:", e)
              return jsonify({"status": "error"}), 500
-    """
-    Start a new chat session and get opening greeting
-    
-    except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({"error": str(e), "status": "error"}), 500
 
 @app.route("/status/<user_id>", methods=["GET"])
 def get_status(user_id):
